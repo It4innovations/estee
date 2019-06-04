@@ -1,0 +1,16 @@
+{
+	"output" : ["score"],
+	"graph_name" : ["crossv", "crossvx"],
+	"graph_set" : [],
+	"graph_id" : [],
+	"cluster_name" : ["16x4", "16x8", "32x16"],
+	"bandwidth" : [],
+	"netmodel" : [],
+	"scheduler_name" : ["tlevel", "blevel-gt"],
+	"imode" : [],
+	"min_sched_interval" : [],
+	"sched_time" : [],
+	"time" : [],
+	"execution_time" : [],
+	"total_transfer": []
+}

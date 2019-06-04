@@ -4,6 +4,7 @@
 
 import argparse
 import itertools
+import json
 import os
 
 import matplotlib.pyplot as plt
@@ -46,11 +47,13 @@ class Data:
         self.raw_data["score"] = self.raw_data["time"] / mins
 
     def prepare(self,
+                f_settings,
                 cluster_name=None,
                 exclude_single=False,
                 netmodel="maxmin",
                 min_sched_interval=0.1,
-                imode="exact"):
+                imode="exact"
+                ):
         rd = self.raw_data
 
         if netmodel:
@@ -70,8 +73,14 @@ class Data:
 
         if cluster_name:
             f &= rd["cluster_name"] == cluster_name
+
         if cluster_name:
             f &= rd["scheduler_name"] != "single"
+
+        for f_item in f_settings:
+            if f_settings[f_item] and not f_item == "output":
+                f &= rd[f_item].isin(f_settings[f_item])
+
         return pd.DataFrame(rd[f])
 
 
@@ -142,7 +151,7 @@ def savefig(name):
     plt.close()
 
 
-def process(filename, args):
+def process(filename, args, f_settings):
     print("processing " + filename)
 
     name = os.path.basename(filename)
@@ -157,92 +166,101 @@ def process(filename, args):
     # ----- Schedulers -----
     if args.all or args.schedulers:
         print("Schedulers ...")
-        dataset = data.prepare()
+        dataset = data.prepare(f_settings)
 
         if len(dataset) > 0:
-            splot(dataset, "cluster_name", "graph_name", x="bandwidth", y="score",
-                style_col="scheduler_name", ylim=(1, 3))
-            savefig(name + "-schedulers-score")
+            if "score" in f_settings["output"] or not f_settings["output"]:
+                splot(dataset, "cluster_name", "graph_name", x="bandwidth", y="score",
+                    style_col="scheduler_name", ylim=(1, 3))
+                savefig(name + "-schedulers-score")
 
-            splot(dataset, "cluster_name", "graph_name", x="bandwidth", y="time",
-                style_col="scheduler_name", sharey=False)
-            savefig(name + "-schedulers-time")
+            if "time" in f_settings["output"] or not f_settings["output"]:
+                splot(dataset, "cluster_name", "graph_name", x="bandwidth", y="time",
+                    style_col="scheduler_name", sharey=False)
+                savefig(name + "-schedulers-time")
 
-            splot(dataset, "cluster_name", "graph_name", x="bandwidth", y="total_transfer",
-                style_col="scheduler_name", sharey=False)
-            savefig(name + "-schedulers-transfer")
+            if "transfer" in f_settings["output"] or not f_settings["output"]:
+                splot(dataset, "cluster_name", "graph_name", x="bandwidth", y="total_transfer",
+                    style_col="scheduler_name", sharey=False)
+                savefig(name + "-schedulers-transfer")
 
     # ----- Netmodel -----
     if args.all or args.netmodels:
         print("Netmodels ...")
-        dataset = data.prepare(cluster_name=cluster_name, netmodel=None, exclude_single=True)
+        dataset = data.prepare(f_settings, cluster_name=cluster_name, netmodel=None, exclude_single=True)
 
         if len(dataset) > 0:
-            splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="time",
-                style_col="netmodel", sharey=False)
-            savefig("{}-{}-netmodel-time".format(name, cluster_name))
+            if "time" in f_settings["output"] or not f_settings["output"]:
+                splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="time",
+                    style_col="netmodel", sharey=False)
+                savefig("{}-{}-netmodel-time".format(name, cluster_name))
 
-            splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="total_transfer",
-                style_col="netmodel", sharey=False)
-            savefig("{}-{}-netmodel-transfer".format(name, cluster_name))
+            if "transfer" in f_settings["output"] or not f_settings["output"]:
+                splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="total_transfer",
+                    style_col="netmodel", sharey=False)
+                savefig("{}-{}-netmodel-transfer".format(name, cluster_name))
 
+            if "score" in f_settings["output"] or not f_settings["output"]:
+                groups = dataset.groupby(
+                    ["graph_name", "graph_id", "cluster_name", "bandwidth", "scheduler_name"])
 
-            groups = dataset.groupby(
-                ["graph_name", "graph_id", "cluster_name", "bandwidth", "scheduler_name"])
+                def normalize(x):
+                    mean = x[x["netmodel"] == "simple"]["time"].mean()
+                    x["time"] /= mean
+                    return x
 
-            def normalize(x):
-                mean = x[x["netmodel"] == "simple"]["time"].mean()
-                x["time"] /= mean
-                return x
-
-            dataset["norms"] = groups.apply(normalize)["time"]
-            splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="norms",
-                sharey=False, style_col="netmodel")
-            savefig("{}-{}-netmodel-score".format(name, cluster_name))
+                dataset["norms"] = groups.apply(normalize)["time"]
+                splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="norms",
+                    sharey=False, style_col="netmodel")
+                savefig("{}-{}-netmodel-score".format(name, cluster_name))
 
 
     # ----- MinSchedTime
     if args.all or args.msd:
         print("MSD ...")
-        dataset = data.prepare(cluster_name=cluster_name, min_sched_interval=None, exclude_single=True)
+        dataset = data.prepare(f_settings, cluster_name=cluster_name, min_sched_interval=None, exclude_single=True)
         if len(dataset) > 0:
-            splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="time",
-                style_col="min_sched_interval", sharey=False)
-            savefig("{}-{}-schedtime-time".format(name, cluster_name))
-            groups = dataset.groupby(
-                ["graph_name", "graph_id", "cluster_name", "bandwidth", "scheduler_name"])
+            if "time" in f_settings["output"] or not f_settings["output"]:
+                splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="time",
+                    style_col="min_sched_interval", sharey=False)
+                savefig("{}-{}-schedtime-time".format(name, cluster_name))
+                groups = dataset.groupby(
+                    ["graph_name", "graph_id", "cluster_name", "bandwidth", "scheduler_name"])
 
-            def normalize(x):
-                mean = x[x["min_sched_interval"] == 0.0]["time"].mean()
-                x["time"] /= mean
-                return x
+            if "score" in f_settings["output"] or not f_settings["output"]:
+                def normalize(x):
+                    mean = x[x["min_sched_interval"] == 0.0]["time"].mean()
+                    x["time"] /= mean
+                    return x
 
-            dataset["norms"] = groups.apply(normalize)["time"]
-            splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="norms",
-                sharey=False, style_col="min_sched_interval")
-            savefig("{}-{}-schedtime-score".format(name, cluster_name))
+                dataset["norms"] = groups.apply(normalize)["time"]
+                splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="norms",
+                    sharey=False, style_col="min_sched_interval")
+                savefig("{}-{}-schedtime-score".format(name, cluster_name))
 
     # ----- Imodes
     if args.all or args.imodes:
         print("Imodes ...")
-        dataset = data.prepare(cluster_name=cluster_name, exclude_single=True, imode=None)
+        dataset = data.prepare(f_settings, cluster_name=cluster_name, exclude_single=True, imode=None)
         if len(dataset) > 0:
-            splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="time",
-                style_col="imode", sharey=False)
-            savefig("{}-{}-imode-time".format(name, cluster_name))
+            if "time" in f_settings["output"] or not f_settings["output"]:
+                splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="time",
+                    style_col="imode", sharey=False)
+                savefig("{}-{}-imode-time".format(name, cluster_name))
 
-            groups = dataset.groupby(
-                ["graph_name", "graph_id", "cluster_name", "bandwidth", "scheduler_name"])
+            if "score" in f_settings["output"] or not f_settings["output"]:
+                groups = dataset.groupby(
+                    ["graph_name", "graph_id", "cluster_name", "bandwidth", "scheduler_name"])
 
-            def normalize_imode(x):
-                mean = x[x["imode"] == "exact"]["time"].mean()
-                x["time"] /= mean
-                return x
+                def normalize_imode(x):
+                    mean = x[x["imode"] == "exact"]["time"].mean()
+                    x["time"] /= mean
+                    return x
 
-            dataset["norms_imode"] = groups.apply(normalize_imode)["time"]
-            splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="norms_imode",
-                sharey=False, style_col="imode")
-            savefig("{}-{}-imode-score".format(name, cluster_name))
+                dataset["norms_imode"] = groups.apply(normalize_imode)["time"]
+                splot(dataset, "graph_name", "scheduler_name", x="bandwidth", y="norms_imode",
+                    sharey=False, style_col="imode")
+                savefig("{}-{}-imode-score".format(name, cluster_name))
     return name
 
 
@@ -258,7 +276,15 @@ if __name__ == "__main__":
     parser.add_argument("--imodes", action="store_true")
     parser.add_argument("--netmodels", action="store_true")
     parser.add_argument("--cluster", default="32x4")
+    parser.add_argument("--settings", default=None)
     args = parser.parse_args()
 
+    if args.settings is not None:
+        with open(args.settings) as file:
+            f_settings = json.load(file)
+
     for resultset in args.resultset:
-        process(resultset, args)
+        process(resultset, args, f_settings)
+        
+    
+    
