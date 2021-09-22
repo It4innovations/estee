@@ -3,7 +3,7 @@ import json
 from estee.common import TaskGraph
 
 
-def json_serialize(graph):
+def serialize_graph(graph):
     task_to_id = {}
     tasks = []
     output_to_index = {}
@@ -27,13 +27,14 @@ def json_serialize(graph):
             output_index = output_to_index[input]
             inputs.append((task_to_id[parent], output_index))
         tasks[i]["inputs"] = inputs
+    return tasks
 
-    return json.dumps(tasks)
+
+def json_serialize(graph):
+    return json.dumps(serialize_graph(graph))
 
 
-def json_deserialize(data):
-    tasks = json.loads(data)
-
+def deserialize_graph(tasks):
     graph = TaskGraph()
     id_to_task = {}
     for t in tasks:
@@ -52,3 +53,7 @@ def json_deserialize(data):
             parent = id_to_task[parent]
             id_to_task[i].add_input(parent.outputs[output_index])
     return graph
+
+
+def json_deserialize(data):
+    return deserialize_graph(json.loads(data))
