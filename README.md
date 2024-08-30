@@ -8,6 +8,26 @@ possible to experiment with different kinds of schedulers, workers, and network
 models. Estee comes with battery-included and provides a standard
 implementation for all its components.
 
+We have published an article about ESTEE titled [Analysis of workflow schedulers in simulated distributed environments
+](https://link.springer.com/article/10.1007/s11227-022-04438-y), where we have performed
+a comprehensive study of various scheduling algorithms. You can use the following BibTex record to cite it:
+
+```bibtex
+@article{estee,
+	author="Beránek, Jakub and Böhm, Stanislav and Cima, Vojtěch",
+	title="Analysis of workflow schedulers in simulated distributed environments",
+	journal="The Journal of Supercomputing",
+	year="2022",
+	month=Sep,
+	day="01",
+	volume="78",
+	number="13",
+	pages="15154--15180",
+	issn="1573-0484",
+	doi="10.1007/s11227-022-04438-y",
+}
+```
+
 ## Achitecture
 
 <img src="docs/arch.png">
